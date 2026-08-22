@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Carousel Creator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Grotesk:wght@500;700&family=Inter:wght@600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    --ink:#0B0E14; --surface:#12161F; --surface2:#171C27;
+    --text:#F2F0E8; --text-dim:#8B93A3; --amber:#E8A33D; --green:#4ADE80; --hair:#232833;
+    --s-bg:#0B0E14; --s-text:#F5F3EC; --s-dim:#B7BECC; --s-accent:#E8A33D; --s-accent2:#4ADE80; --s-hair:#2B3140; --s-card:rgba(232,163,61,0.08);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--ink); color:var(--text); font-family:'Inter',sans-serif; display:flex; min-height:100vh;}
+  #panel{width:380px; min-width:380px; background:var(--surface); border-right:1px solid var(--hair); padding:22px; display:flex; flex-direction:column; gap:14px; height:100vh; overflow-y:auto; position:sticky; top:0;}
+  .eyebrow{font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:.12em; color:var(--amber); text-transform:uppercase; margin:0;}
+  h1{font-family:'Space Grotesk',sans-serif; font-size:20px; margin:2px 0 6px; font-weight:700;}
+  p.hint{color:var(--text-dim); font-size:12.5px; line-height:1.5; margin:0 0 4px;}
+  label{font-size:11px; color:var(--text-dim); font-family:'JetBrains Mono',monospace; letter-spacing:.05em; text-transform:uppercase; margin-top:6px;}
+  input[type=text], textarea{width:100%; background:var(--ink); border:1px solid var(--hair); color:var(--text); border-radius:6px; padding:10px; font-family:'Inter',sans-serif; font-size:13px; resize:vertical; outline:none;}
+  input[type=text]:focus, textarea:focus{border-color:var(--amber);}
+  textarea#raw{min-height:220px; line-height:1.5; font-family:'JetBrains Mono',monospace; font-size:12px;}
+  .row{display:flex; gap:8px;}
+  .row > *{flex:1;}
+  .bgSwatches{display:flex; gap:8px; margin-top:4px; flex-wrap:wrap;}
+  .bgSwatch{width:38px; height:38px; border-radius:8px; cursor:pointer; border:2px solid var(--hair); position:relative;}
+  .bgSwatch.active{border-color:var(--amber);}
+  .bgSwatch.custom{display:flex; align-items:center; justify-content:center; background:#1c1c1c;}
+  .bgSwatch input[type=color]{position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%;}
+  button{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:13px; border-radius:6px; border:none; padding:11px 14px; cursor:pointer;}
+  button:active{transform:scale(0.97);}
+  #buildBtn{background:var(--text); color:var(--ink); margin-top:4px;}
+  #exportBtn{background:var(--amber); color:#1a1200; margin-top:6px;}
+  #exportBtn:disabled{opacity:.5; cursor:wait;}
+  .ghost{background:transparent; color:var(--text-dim); border:1px solid var(--hair);}
+  #status{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--green); min-height:16px;}
+  .divider{height:1px; background:var(--hair); margin:8px 0;}
+
+  #stage{flex:1; padding:36px; overflow-y:auto;}
+  #slidesContainer{display:flex; flex-wrap:wrap; gap:26px; align-items:flex-start;}
+  .slideWrap{width:calc(1080px * var(--preview-scale, 0.2593)); height:calc(1350px * var(--preview-scale, 0.2593)); overflow:hidden; position:relative; border-radius:8px; box-shadow:0 8px 30px rgba(0,0,0,.5);}
+  .slide{
+    width:1080px; height:1350px; transform:scale(var(--preview-scale, 0.2593)); transform-origin:top left;
+    background-color:var(--s-bg);
+    background-image:
+      var(--dot-img),
+      radial-gradient(circle at 88% 6%, var(--s-card) 0%, transparent 42%),
+      radial-gradient(circle at 6% 96%, var(--s-card) 0%, transparent 38%);
+    background-repeat: repeat, no-repeat, no-repeat;
+    background-size: 34px 34px, auto, auto;
+    position:relative; display:flex; flex-direction:column;
+    padding:64px; font-family:'Inter',sans-serif; overflow:hidden;
+  }
+  .ringDeco{position:absolute; border-radius:50%; border:2px solid var(--s-hair); z-index:0; pointer-events:none;}
+  .ringDeco.r1{width:520px; height:520px; top:-220px; right:-220px;}
+  .ringDeco.r2{width:320px; height:320px; bottom:-140px; left:-140px; border-color:var(--s-card);}
+  .slideTop{display:flex; justify-content:space-between; align-items:center; width:100%; position:relative; z-index:2;}
+  .brandTag{font-family:'JetBrains Mono',monospace; font-weight:700; font-size:22px; letter-spacing:.1em; color:var(--s-dim); text-transform:uppercase;}
+  .counter{font-family:'JetBrains Mono',monospace; font-weight:700; font-size:22px; color:var(--s-accent); background:var(--s-card); padding:6px 16px; border-radius:999px;}
+  .slideMid{flex:1; display:flex; flex-direction:column; justify-content:center; gap:24px; width:100%; position:relative; z-index:2;}
+  .badgeWrap{position:relative; width:120px; height:120px;}
+  .badgeShadow{position:absolute; top:14px; left:14px; width:120px; height:120px; border-radius:26px; background-color:var(--s-card);}
+  .badge{width:120px; height:120px; border-radius:26px; background-color:var(--s-accent); color:var(--s-bg); display:flex; align-items:center; justify-content:center; font-family:'Anton',sans-serif; font-weight:400; font-size:56px; position:absolute; top:0; left:0;}
+  .accentBar{width:160px; height:10px; background-color:var(--s-accent); border-radius:5px; position:relative;}
+  .accentBar::after{content:''; position:absolute; right:-22px; top:50%; transform:translateY(-50%); width:14px; height:14px; border-radius:50%; background-color:var(--s-accent);}
+  .slideTitle{font-family:'Anton',sans-serif; font-weight:400; color:var(--s-text); line-height:1.04; outline:none;}
+  .slideBody{font-size:40px; font-weight:700; line-height:1.45; color:var(--s-dim); outline:none;}
+  .bLine{margin-bottom:20px;}
+  .bLine:last-child{margin-bottom:0;}
+  .bBullet{display:flex; align-items:center; gap:18px;}
+  .bBullet .bMark{width:38px; height:38px; border-radius:50%; background-color:var(--s-accent); color:var(--s-bg); flex-shrink:0; display:flex; align-items:center; justify-content:center;}
+  .slideFoot{display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--s-hair); padding-top:22px; width:100%; position:relative; z-index:2;}
+  .handle{font-family:'JetBrains Mono',monospace; font-weight:700; font-size:20px; color:var(--s-dim);}
+  .type-title .slideTitle{font-size:112px; letter-spacing:-.01em; text-transform:uppercase;}
+  .type-title .hlNum{color:var(--s-accent2);}
+  .type-title .hlPop{background-color:#FF2E7A; color:#FFFFFF; padding:2px 12px; border-radius:6px; box-decoration-break:clone; -webkit-box-decoration-break:clone; display:inline-block;}
+  .type-title .slideMid{align-items:flex-start; gap:32px;}
+  .type-content .slideMid{gap:30px;}
+  .type-content .badgeWrap{margin-bottom:2px;}
+  .type-content .slideTitle{font-size:66px;}
+  .type-cta .slideMid{align-items:center; text-align:center; gap:30px;}
+  .type-cta .iconRing{width:130px; height:130px; border-radius:50%; background-color:var(--s-card); border:2px solid var(--s-accent); display:flex; align-items:center; justify-content:center; color:var(--s-accent); box-shadow:0 0 0 14px var(--s-card);}
+  .type-cta .slideTitle{font-size:78px;}
+  .type-cta .slideBody{font-size:38px;}
+  .type-cta .ctaPill{background-color:var(--s-accent); color:var(--s-bg); font-family:'Anton',sans-serif; font-weight:400; font-size:34px; padding:26px 52px; border-radius:999px; margin-top:6px; box-shadow:0 16px 40px -10px var(--s-accent);}
+  .heroWrap{position:relative; width:200px; height:200px;}
+  .heroShadow{position:absolute; top:14px; left:14px; width:200px; height:200px; border-radius:32px; background-color:var(--s-card);}
+  .heroGraphic{width:200px; height:200px; border-radius:32px; background-color:var(--s-card); border:2px solid var(--s-hair); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; position:absolute; top:0; left:0;}
+  .heroGraphic .hgNum{font-family:'Anton',sans-serif; font-size:64px; color:var(--s-accent);}
+  .heroGraphic .hgLabel{font-family:'JetBrains Mono',monospace; font-weight:700; font-size:18px; color:var(--s-dim); letter-spacing:.08em; text-transform:uppercase;}
+  .quoteDeco{position:absolute; font-family:'Anton',sans-serif; font-size:340px; color:var(--s-accent); opacity:.07; line-height:1; top:-40px; right:36px; z-index:0; pointer-events:none;}
+  .swipeRow{display:flex; align-items:center; gap:16px; z-index:2; position:relative; margin-top:8px;}
+  .swipeRow .swipePill{display:flex; align-items:center; gap:10px; background-color:var(--s-accent); color:var(--s-bg); font-family:'JetBrains Mono',monospace; font-weight:700; font-size:24px; letter-spacing:.04em; text-transform:uppercase; padding:16px 30px; border-radius:999px;}
+  .swipeRow .chev{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:26px;}
+  .slideControls{position:absolute; top:-1px; right:0; display:flex; gap:4px; z-index:3;}
+  .miniBtn{width:22px; height:22px; border-radius:4px; background:var(--surface2); color:var(--text-dim); display:flex; align-items:center; justify-content:center; font-size:13px; cursor:pointer; border:1px solid var(--hair);}
+  .miniBtn:hover{color:var(--text);}
+
+  @media (max-width: 768px){
+    body{flex-direction:column;}
+    #panel{width:100%; min-width:0; height:auto; max-height:none; position:static; border-right:none; border-bottom:1px solid var(--hair);}
+    #stage{padding:20px 14px;}
+    #slidesContainer{flex-direction:column; align-items:center; gap:22px;}
+    .row{flex-direction:column;}
+    button{width:100%; padding:14px; font-size:14px;}
+    .bgSwatch{width:42px; height:42px;}
+    .miniBtn{width:30px; height:30px; font-size:16px;}
+    input[type=text], textarea{font-size:16px;}
+  }
+</style>
+</head>
+<body>
+
+<div id="panel">
+  <p class="eyebrow">// carousel → pdf</p>
+  <h1>Carousel Creator</h1>
+  <p class="hint">Paste content below. Separate slides with a line containing only <b>---</b>. Prefix a line with <b># </b> for the heading. Body text with 2+ sentences auto-splits into checkmark bullets — or prefix a line with <b>- </b> to force one bullet. Slide 1 auto-highlights numbers and key words.</p>
+
+  <label>Background color</label>
+  <div class="bgSwatches" id="bgSwatches"></div>
+
+  <label>Brand tag</label>
+  <input type="text" id="brand" value="DATA COMEBACK">
+  <label>Handle</label>
+  <input type="text" id="handle" value="@deepchatterjee">
+  <label>Raw content</label>
+  <textarea id="raw"># 10 dashboards. 1 mistake. ₹10 lakh lost.
+You're under-visible. Most analysts plateau at ₹6 LPA doing the exact same 3 things.
+---
+# You report numbers, not decisions
+A dashboard nobody acts on isn't insight, it's decoration.
+- If it doesn't change what someone does next
+- You built the wrong thing
+---
+# You wait for tickets
+Top analysts flag the problem before anyone files a request.
+- Spotting it first = operator mindset
+- Waiting for it = report generator
+---
+# You never say "here's what I'd do"
+A number without a recommendation is half a deliverable.
+- Attach a stance to every report
+- Even if it's wrong, especially if it's wrong
+---
+# Fix these 3, change your ceiling
+Same skills. Same tools. Completely different trajectory.
+- Leadership starts seeing you make calls
+- Not just charts
+---
+Save this before your next report.
+Follow @deepchatterjee for the frameworks that got me here.</textarea>
+
+  <div class="row">
+    <button id="buildBtn">Build slides</button>
+  </div>
+  <div class="divider"></div>
+  <button id="exportBtn">Export PDF</button>
+  <button id="addSlideBtn" class="ghost">+ Add blank slide</button>
+  <button id="clearBtn" class="ghost" style="color:#ff6b6b; border-color:#ff6b6b33;">🗑 Delete all content</button>
+  <div id="status"></div>
+</div>
+
+<div id="stage">
+  <div id="slidesContainer"></div>
+</div>
+
+<script>
+const container = document.getElementById('slidesContainer');
+
+const BG_OPTIONS = ['#0B0E14','#15130F','#060807','#080B14','#160808','#F4F1EA'];
+let activeBg = BG_OPTIONS[0];
+
+function hexToRgb(hex){
+  const h = hex.replace('#','');
+  return [0,2,4].map(i=>parseInt(h.substring(i,i+2),16));
+}
+function relLuminance(hex){
+  const [r,g,b] = hexToRgb(hex).map(v=>{
+    v/=255; return v<=0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055,2.4);
+  });
+  return 0.2126*r + 0.7152*g + 0.0722*b;
+}
+function applyBg(hex){
+  activeBg = hex;
+  const light = relLuminance(hex) > 0.5;
+  const [r,g,b] = hexToRgb('#E8A33D');
+  const s = container.style;
+  s.setProperty('--s-bg', hex);
+  s.setProperty('--s-text', light ? '#171512' : '#F5F3EC');
+  s.setProperty('--s-dim', light ? '#4B453C' : '#B7BECC');
+  s.setProperty('--s-hair', light ? '#D9D2C3' : '#2B3140');
+  s.setProperty('--s-card', `rgba(${r},${g},${b},0.10)`);
+  const dotColor = light ? 'rgba(23,21,18,0.35)' : 'rgba(255,255,255,0.35)';
+  const dotSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='34' height='34'><circle cx='3' cy='3' r='1.5' fill='${dotColor}'/></svg>`;
+  s.setProperty('--dot-img', `url("data:image/svg+xml,${encodeURIComponent(dotSvg)}")`);
+  document.querySelectorAll('.bgSwatch[data-hex]').forEach(el=> el.classList.toggle('active', el.dataset.hex.toLowerCase()===hex.toLowerCase()));
+}
+
+function renderBgSwatches(){
+  const wrap = document.getElementById('bgSwatches');
+  wrap.innerHTML = BG_OPTIONS.map(hex=>`<div class="bgSwatch" data-hex="${hex}" style="background-color:${hex}"></div>`).join('')
+    + `<div class="bgSwatch custom" title="Custom color">🎨<input type="color" id="customBg" value="${activeBg}"></div>`;
+  wrap.querySelectorAll('.bgSwatch[data-hex]').forEach(el=>{
+    el.addEventListener('click', ()=> applyBg(el.dataset.hex));
+  });
+  document.getElementById('customBg').addEventListener('input', e=> applyBg(e.target.value));
+  applyBg(activeBg);
+}
+
+function bulletDiv(txt){
+  return `<div class="bLine bBullet"><span class="bMark">${iconSvg('check',20)}</span><span>${txt}</span></div>`;
+}
+function bodyToHtml(body){
+  const lines = body.split('\n').map(l=>l.trim()).filter(Boolean);
+  if(lines.length===0) return '';
+  return lines.map(line=>{
+    if(/^[-•]\s+/.test(line)){
+      const txt = line.replace(/^[-•]\s+/,'');
+      return bulletDiv(txt);
+    }
+    const sentences = line.split(/(?<=[.!?])\s+/).map(s=>s.trim()).filter(Boolean);
+    if(sentences.length >= 2){
+      const [first, ...rest] = sentences;
+      return `<div class="bLine">${first}</div>` + rest.map(bulletDiv).join('');
+    }
+    return `<div class="bLine">${line}</div>`;
+  }).join('');
+}
+
+const ICON_PATHS = {
+  warning: '<path d="M12 3 L22 20 H2 Z"/><line x1="12" y1="9" x2="12" y2="14"/><circle cx="12" cy="17.3" r="0.9" fill="currentColor" stroke="none"/>',
+  money: '<circle cx="12" cy="12" r="9"/><text x="12" y="16.5" font-size="11" text-anchor="middle" fill="currentColor" stroke="none" font-family="Arial, sans-serif">₹</text>',
+  idea: '<path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.7.5 1 .9 1 1.8v.5h6v-.5c0-.9.3-1.3 1-1.8A7 7 0 0 0 12 2Z"/>',
+  chart: '<line x1="4" y1="20" x2="4" y2="12"/><line x1="10" y1="20" x2="10" y2="6"/><line x1="16" y1="20" x2="16" y2="14"/><line x1="21" y1="20" x2="21" y2="9"/>',
+  ticket: '<path d="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4Z"/><line x1="10" y1="6" x2="10" y2="18" stroke-dasharray="2 2"/>',
+  growth: '<polyline points="3,17 9,11 13,15 21,5"/><polyline points="14,5 21,5 21,12"/>',
+  bell: '<path d="M6 8a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+  target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/>',
+  check: '<path d="M4 12l5 5L20 6"/>'
+};
+const ICON_RULES = [
+  { keys:['mistake','wrong','never','fail','lost',"don't",'didn\'t','underpaid'], icon:'warning', label:'Watch Out' },
+  { keys:['₹','lpa','lakh','salary','money','pay','cost'], icon:'money', label:'Money' },
+  { keys:['decision','recommend','insight','idea','stance',"here's what"], icon:'idea', label:'Insight' },
+  { keys:['dashboard','report','chart','data','kpi'], icon:'chart', label:'Data' },
+  { keys:['ticket','request','wait'], icon:'ticket', label:'Process' },
+  { keys:['ceiling','trajectory','grow','change','fix','operator'], icon:'growth', label:'Growth' },
+  { keys:['follow','save','share','swipe'], icon:'bell', label:'Action' }
+];
+function pickIcon(text){
+  const t = (text||'').toLowerCase();
+  for(const rule of ICON_RULES){
+    if(rule.keys.some(k=>t.includes(k))) return rule;
+  }
+  return { icon:'target', label:'Focus' };
+}
+function iconSvg(key, size){
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON_PATHS[key]||ICON_PATHS.target}</svg>`;
+}
+function slideText(wrap){
+  const t = wrap.querySelector('.slideTitle');
+  const b = wrap.querySelector('.slideBody');
+  return (t?t.textContent:'') + ' ' + (b?b.textContent:'');
+}
+
+
+const STOPWORDS = new Set(['a','an','the','is','are','was','were','be','been','to','of','in','on','at','for','and','or','but','not','you','your','youre',"you're",'i','we','they','he','she','it','this','that','these','those','my','our','their','with','as','by','from','so','if','do','does','did','will','would','can','could','should','just','only','also','more','than','then','there','here','what','who','when','where','which','all','any','some','most','one','get','got','make','made','no','yes','re','ve','ll']);
+function colorizeTitle(text){
+  const manualStore = [];
+  const working = text.replace(/\*\*(.+?)\*\*/g, (m, inner)=>{
+    manualStore.push(inner);
+    return `@@HL${manualStore.length-1}@@`;
+  });
+  const tokens = working.split(/(\s+)/);
+  let autoCount = 0;
+  const MAX_AUTO = 3;
+  const out = tokens.map(tok=>{
+    if(tok==='' || /^\s+$/.test(tok)) return tok;
+    const placeholder = tok.match(/^@@HL(\d+)@@([.,!?]*)$/);
+    if(placeholder){
+      return `<span class="hlPop">${manualStore[+placeholder[1]]}</span>${placeholder[2]}`;
+    }
+    if(/\d/.test(tok)){
+      return `<span class="hlNum">${tok}</span>`;
+    }
+    const normalized = tok.toLowerCase().replace(/[^a-z']/g,'');
+    if(autoCount < MAX_AUTO && normalized.length>=4 && !STOPWORDS.has(normalized)){
+      autoCount++;
+      return `<span class="hlPop">${tok}</span>`;
+    }
+    return tok;
+  });
+  return out.join('');
+}
+
+function makeSlideEl(title, body, type){
+  const wrap = document.createElement('div');
+  wrap.className = 'slideWrap';
+  const titleHtml = type==='title' ? colorizeTitle(title) : title;
+  wrap.innerHTML = `
+    <div class="slideControls">
+      <div class="miniBtn" data-act="up">↑</div>
+      <div class="miniBtn" data-act="down">↓</div>
+      <div class="miniBtn" data-act="del">✕</div>
+    </div>
+    <div class="slide type-${type}">
+      <div class="ringDeco r1"></div>
+      <div class="ringDeco r2"></div>
+      ${type==='content' ? '<div class="quoteDeco">"</div>' : ''}
+      <div class="slideTop">
+        <span class="brandTag" data-role="brand"></span>
+        <span class="counter" data-role="counter"></span>
+      </div>
+      <div class="slideMid" data-role="mid">
+        <div class="slideTitle" contenteditable="true">${titleHtml}</div>
+        <div class="accentBar" data-role="accentbar"></div>
+        <div class="slideBody" contenteditable="true">${bodyToHtml(body)}</div>
+      </div>
+      <div class="slideFoot">
+        <span class="handle" data-role="handle"></span>
+      </div>
+    </div>`;
+  return wrap;
+}
+
+function parseRaw(raw){
+  const blocks = raw.split(/\n---\n/).map(b=>b.trim()).filter(Boolean);
+  return blocks.map((b, i)=>{
+    const lines = b.split('\n').filter(l=>l.trim().length);
+    let title = '', bodyLines = [];
+    if(lines[0] && lines[0].startsWith('# ')){
+      title = lines[0].replace('# ','').trim();
+      bodyLines = lines.slice(1);
+    } else {
+      title = lines[0] || '';
+      bodyLines = lines.slice(1);
+    }
+    return {title, body: bodyLines.join('\n'), type: i===0 ? 'title' : 'content'};
+  });
+}
+
+function renderAll(slides){
+  container.innerHTML = '';
+  slides.forEach(s=> container.appendChild(makeSlideEl(s.title, s.body, s.type)));
+  refreshMeta();
+  applyBg(activeBg);
+}
+
+function addSlide(title='New headline', body='Body copy goes here.', type='content'){
+  container.appendChild(makeSlideEl(title, body, type));
+  refreshMeta();
+}
+
+function refreshMeta(){
+  const brand = document.getElementById('brand').value || 'DATA COMEBACK';
+  const handle = document.getElementById('handle').value || '@yourhandle';
+  const total = container.children.length;
+  let contentCount = 0;
+  for(let i=0;i<total;i++){
+    const t = i===0 ? 'title' : (i===total-1 && total>1 ? 'cta' : 'content');
+    if(t==='content') contentCount++;
+  }
+  let contentIdx = 0;
+
+  [...container.children].forEach((wrap, i)=>{
+    const slideEl = wrap.querySelector('.slide');
+    const mid = wrap.querySelector('[data-role=mid]');
+    const newType = i===0 ? 'title' : (i===total-1 && total>1 ? 'cta' : 'content');
+    slideEl.className = 'slide type-' + newType;
+    wrap.querySelector('[data-role=brand]').textContent = brand;
+    wrap.querySelector('[data-role=handle]').textContent = handle;
+
+    if(slideEl.dataset.builtType !== newType){
+      mid.querySelectorAll('.badgeWrap,.heroWrap,[data-role=swiperow],[data-role=iconring],[data-role=ctapill]').forEach(el=>el.remove());
+      if(newType==='content'){
+        mid.insertAdjacentHTML('afterbegin', `<div class="badgeWrap"><div class="badgeShadow"></div><div class="badge" data-role="badge"></div></div>`);
+      } else if(newType==='title'){
+        mid.insertAdjacentHTML('beforeend', `<div class="heroWrap"><div class="heroShadow"></div><div class="heroGraphic" data-role="hero"><div class="hgNum" data-role="heronum"></div><span class="hgLabel" data-role="herolabel">Parts Inside</span></div></div>`);
+        mid.insertAdjacentHTML('beforeend', `<div class="swipeRow" data-role="swiperow"><div class="swipePill"><span>Swipe</span><span class="chev">›</span></div></div>`);
+      } else if(newType==='cta'){
+        mid.insertAdjacentHTML('afterbegin', `<div class="iconRing" data-role="iconring">${iconSvg('check', 48)}</div>`);
+        mid.insertAdjacentHTML('beforeend', `<div class="ctaPill" contenteditable="true" data-role="ctapill">Follow for more →</div>`);
+      }
+      slideEl.dataset.builtType = newType;
+    }
+
+    if(newType==='content'){
+      contentIdx++;
+      const badgeEl = wrap.querySelector('[data-role=badge]');
+      if(badgeEl){
+        badgeEl.textContent = String(contentIdx).padStart(2,'0');
+        badgeEl.style.transform = (contentIdx % 2 === 0) ? 'rotate(3deg)' : 'rotate(-3deg)';
+      }
+    }
+    const heroNumEl = wrap.querySelector('[data-role=heronum]');
+    if(heroNumEl) heroNumEl.textContent = String(contentCount).padStart(2,'0');
+
+    wrap.querySelector('[data-role=counter]').textContent = String(i+1).padStart(2,'0') + ' / ' + String(total).padStart(2,'0');
+  });
+}
+
+container.addEventListener('click', (e)=>{
+  const btn = e.target.closest('.miniBtn');
+  if(!btn) return;
+  const wrap = btn.closest('.slideWrap');
+  const act = btn.dataset.act;
+  if(act==='del'){ wrap.remove(); }
+  if(act==='up' && wrap.previousElementSibling){ container.insertBefore(wrap, wrap.previousElementSibling); }
+  if(act==='down' && wrap.nextElementSibling){ container.insertBefore(wrap.nextElementSibling, wrap); }
+  refreshMeta();
+});
+
+document.getElementById('buildBtn').addEventListener('click', ()=>{
+  renderAll(parseRaw(document.getElementById('raw').value));
+});
+document.getElementById('addSlideBtn').addEventListener('click', ()=> addSlide());
+document.getElementById('clearBtn').addEventListener('click', ()=>{
+  if(confirm('Delete all slides and clear the content box? This cannot be undone.')){
+    document.getElementById('raw').value = '';
+    container.innerHTML = '';
+    document.getElementById('status').textContent = 'All content cleared.';
+  }
+});
+document.getElementById('brand').addEventListener('input', refreshMeta);
+document.getElementById('handle').addEventListener('input', refreshMeta);
+
+function updatePreviewScale(){
+  const isMobile = window.innerWidth <= 768;
+  const scale = isMobile
+    ? Math.min(window.innerWidth - 48, 420) / 1080
+    : 0.2593;
+  document.documentElement.style.setProperty('--preview-scale', scale);
+}
+updatePreviewScale();
+window.addEventListener('resize', updatePreviewScale);
+
+renderBgSwatches();
+renderAll(parseRaw(document.getElementById('raw').value));
+
+document.getElementById('exportBtn').addEventListener('click', async ()=>{
+  const exportBtn = document.getElementById('exportBtn');
+  const status = document.getElementById('status');
+  const slideEls = [...document.querySelectorAll('.slide')];
+  if(slideEls.length === 0){ status.textContent = 'No slides to export.'; return; }
+  exportBtn.disabled = true;
+
+  if(document.fonts && document.fonts.ready){
+    status.textContent = 'Loading fonts...';
+    try{ await document.fonts.ready; }catch(e){}
+  }
+
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ unit:'px', format:[1080,1350], compress:true });
+
+  for(let i=0; i<slideEls.length; i++){
+    status.textContent = `Rendering slide ${i+1}/${slideEls.length}...`;
+    const original = slideEls[i];
+    const clone = original.cloneNode(true);
+    clone.style.transform = 'none';
+    clone.style.position = 'fixed';
+    clone.style.top = '0';
+    clone.style.left = '-99999px';
+    clone.style.margin = '0';
+    container.appendChild(clone);
+    // wait two frames so layout/paint settle before capture
+    await new Promise(r => requestAnimationFrame(()=>requestAnimationFrame(r)));
+    const canvas = await html2canvas(clone, { scale:2, backgroundColor: activeBg, useCORS:true, logging:false });
+    container.removeChild(clone);
+    const img = canvas.toDataURL('image/jpeg', 0.95);
+    if(i>0) pdf.addPage([1080,1350], 'portrait');
+    pdf.addImage(img, 'JPEG', 0, 0, 1080, 1350);
+  }
+  status.textContent = 'Saving...';
+  pdf.save('carousel.pdf');
+  status.textContent = `Done — ${slideEls.length} slides exported.`;
+  exportBtn.disabled = false;
+});
+</script>
+</body>
+</html>
